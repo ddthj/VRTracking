@@ -121,6 +121,8 @@ def calibrate(tracked: TrackedObject):
                         print(np.dot(ident_matrix, fid.rotation))
                     else:
                         print("couldn't find a linked fiducial!")
+
+                #Debug stuff
                 elif ident != tracked.reference and tracked.reference in ids:
                     fid = tracked.fiducials[ident]
                     ref_corners = corner_list[ids.index(tracked.reference)]

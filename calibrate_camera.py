@@ -42,6 +42,7 @@ def calibration_process():
             ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
             np.savez("calibration.npz", name1=mtx, name2=dist, name3=rvecs, name4=tvecs)
             print("Calibration Complete!")
+            cv2.destroyAllWindows()
             return mtx, dist, rvecs, tvecs
 
         if cv2.waitKey(10) & 0xFF == ord("q") or images_captured >= 20:
