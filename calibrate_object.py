@@ -7,6 +7,7 @@ from calibrate_camera import get_calibration
 
 s = 13.25
 FIDUCIAL_CORNERS = np.float32([[-s, s, 0], [s, s, 0], [s, -s, 0], [-s, -s, 0]]).reshape(-1, 3)
+FIDUCIAL_CORNERS_DEPTH = np.float32([[-s, s, -13], [s, s, -13], [s, -s, -13], [-s, -s, -13]]).reshape(-1, 3)
 FIDUCIAL_CENTER = np.array([s, s, 0])
 
 
@@ -110,6 +111,9 @@ def calibrate(tracked: TrackedObject):
                                         (0, 0, 255), thickness=2)
                     projected2, _ = cv2.projectPoints(FIDUCIAL_CORNERS, ident_rot, ident_loc, camera_matrix,
                                                       camera_dist)
+                    test, _ = cv2.projectPoints(FIDUCIAL_CORNERS_DEPTH, ident_rot, ident_loc, camera_matrix,
+                                                camera_dist)
+                    frame = cv2.polylines(frame, [np.int32(test).reshape(-1, 1, 2)], True, (0, 0, 255), 2)
                     cv2.circle(frame, tuple(projected.ravel()), 5, (0, 0, 255), -1)
                     frame = cv2.polylines(frame, [np.int32(projected2).reshape(-1, 1, 2)], True, (0, 0, 255), 2)
 
