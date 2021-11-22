@@ -7,8 +7,28 @@ from calibrate_camera import get_calibration
 
 s = 13.25
 FIDUCIAL_CORNERS = np.float32([[-s, s, 0], [s, s, 0], [s, -s, 0], [-s, -s, 0]]).reshape(-1, 3)
-FIDUCIAL_CORNERS_DEPTH = np.float32([[-s, s, -13], [s, s, -13], [s, -s, -13], [-s, -s, -13]]).reshape(-1, 3)
+FIDUCIAL_CORNERS_DEPTH = np.float32([[-s, s, -16], [s, s, -16], [s, -s, -16], [-s, -s, -16]]).reshape(-1, 3)
 FIDUCIAL_CENTER = np.array([s, s, 0])
+
+
+def npv(x, y, z):
+    return np.float32([x, y, z]).reshape(3)
+
+
+HEADSET_FIDUCIALS = {
+    0: npv(0, 0, -150.0),
+    1: npv(-31, -35.6, -150.0),
+    2: npv(32.6, -35.6, -150.0),
+    4: npv(0, 21.8, -113.5),
+    5: npv(-45, 21.8, -127.7),
+    6: npv(45, 21.8, -127.7),
+    7: npv(-75, -3.5, -22.3),
+    8: npv(-75, -40.1, -22.3),
+    9: npv(-93.3, -20, -122.7),
+    10: npv(75, -40.1, -22.3),
+    11: npv(75, -3.5, -22.3),
+    13: npv(-93.3, -13.5, -124)
+}
 
 
 class TrackedObject:
@@ -23,6 +43,18 @@ class Fiducial:
         self.ident = ident
         self.rotation = rotation
         self.translation = translation
+        self.samples = [translation]
+
+    def get_loc(self):
+        temp_avg = sum(self.samples) / len(self.samples)
+        final = []
+        for item in self.samples:
+            if np.linalg.norm(item - temp_avg) < 20:
+                final.append(item)
+        if len(final) > 0:
+            return sum(final) / len(final)
+        else:
+            return temp_avg
 
 
 def calibrate(tracked: TrackedObject):
@@ -41,6 +73,22 @@ def calibrate(tracked: TrackedObject):
         link_is_reference = False
         if ids is not None:
             ids = list(ids.ravel())
+            object_points = np.float32([HEADSET_FIDUCIALS[x] for x in ids if HEADSET_FIDUCIALS.get(x, None) is not None])
+            centers = []
+            for i in range(len(ids)):
+                corners = corner_list[i][0]
+                centers.append(np.mean(corners, axis=0))
+
+            if len(centers) >= 4:
+                try:
+                    hmd_ret, hmd_rot, hmd_vec = cv2.solvePnP(object_points, np.float32(centers), camera_matrix, camera_dist)
+                    p, _ = cv2.projectPoints(FIDUCIAL_CORNERS, hmd_rot, hmd_vec, camera_matrix,
+                                          camera_dist)
+                    frame = cv2.polylines(frame, [np.int32(p).reshape(-1, 1, 2)], True, (0, 255, 0), 2)
+                except:
+                    pass
+
+            """
             for i in range(len(ids)):
                 keys = tracked.fiducials.keys()
                 ident = ids[i]
@@ -90,9 +138,8 @@ def calibrate(tracked: TrackedObject):
                             ref_loc = ident_loc + ident_matrix.dot(link.translation)
 
                         ident_to_ref_matrix = np.linalg.inv(ident_matrix).dot(ref_matrix)
-                        relative = ref_loc - ident_loc
-                        print("relative distance: ", relative)
-                        local_distance = relative.dot(ident_matrix)
+                        relative = ident_loc - ref_loc
+                        local_distance = relative.dot(ref_matrix)
                         tracked.fiducials[ident] = Fiducial(ident, ident_to_ref_matrix, local_distance)
                     else:
                         print("couldn't find a linked fiducial!")
@@ -122,6 +169,7 @@ def calibrate(tracked: TrackedObject):
                     projected3, _ = cv2.projectPoints(FIDUCIAL_CORNERS, est_ref_rot, est_ref_loc, camera_matrix,
                                                       camera_dist)
                     frame = cv2.polylines(frame, [np.int32(projected3).reshape(-1, 1, 2)], True, (0, 255, 0), 2)
+            """
 
         cv2.imshow("tracker", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -129,22 +177,3 @@ def calibrate(tracked: TrackedObject):
     cap.release()
     cv2.destroyAllWindows()
     print("Calibration of '%s' complete!" % tracked.name)
-
-
-"""
-                elif ident != tracked.reference:
-                    point = np.array([0, 0, 0], dtype=np.float32).reshape(-1, 3)
-                    # projected, _ = cv2.projectPoints(point, ident_rot, ident_vec, camera_matrix, camera_dist)
-                    # cv2.circle(frame, tuple(projected[0].ravel()), 5, (0, 255, 0), -1)
-                    fid = tracked.fiducials[ident]
-                    ident_center = ident_vec.reshape(3) + np.dot(np.linalg.inv(ident_matrix), FIDUCIAL_CENTER)
-                    mini, __ = cv2.projectPoints(point, ident_rot, ident_center, camera_matrix, camera_dist)
-                    frame = cv2.circle(frame, tuple(np.int32(mini).reshape(2).tolist()), 5, (0, 34, 255), -1)
-
-                    ref_vec_est = np.dot(fid.rotation.T, fid.translation) + ident_vec
-                    ref_rot_est = np.dot(fid.rotation, ident_matrix)
-
-                    # projected, _ = cv2.projectPoints(FIDUCIAL_CORNERS, ident_rot, ident_vec, camera_matrix, camera_dist)
-                    # projected, _ = cv2.projectPoints(FIDUCIAL_CORNERS, ref_rot_est, ref_vec_est, camera_matrix, camera_dist)
-                    # frame = cv2.polylines(frame, [np.int32(projected).reshape(-1, 1, 2)], True, (0, 34, 255), 2)
-"""
